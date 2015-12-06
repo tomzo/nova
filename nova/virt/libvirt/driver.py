@@ -2863,6 +2863,24 @@ class LibvirtDriver(driver.ComputeDriver):
         disk.mkfs(os_type, fs_label, target, run_as_root=is_block_dev,
                   specified_fs=specified_fs)
 
+        # backing file is created at target
+        # now we can move it to target.eprd
+        # and setup a symlink to /dev/eprdX which is backed by target.eprd
+        eprd_back = "%s.eprd" % (target)
+        _rename(target, eprd_back)
+
+        utils.execute('eprd-manage', '-b', eprd_back, '-f', target)
+
+    def _rename(src, dst):
+        LOG.info("Renaming file '%s' -> '%s'" % (src, dst))
+        try:
+            os.rename(src, dst)
+        except OSError, e:  # noqa
+            if e.errno == errno.EXDEV:
+                LOG.error("Invalid cross-device link.  Perhaps %s and %s should "
+                          "be symlinked on the same filesystem?" % (src, dst))
+            raise
+
     @staticmethod
     def _create_swap(target, swap_mb, max_size=None, context=None):
         """Create a swap file of specified size."""
